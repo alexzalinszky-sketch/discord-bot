@@ -22,7 +22,7 @@ const PORT = process.env.PORT || 10000;
 const TOKEN = process.env.TOKEN;
 const GUILD_ID = "1484897711663743168";
 const ROLE_ID = "1494281710332940338";
-const RULES_CHANNEL_ID = "1491041943088533605";
+const RULES_CHANNEL_ID = "1491041943088533605"; // Ide fogja küldeni
 const BASE_URL = "https://documentation-k61j.onrender.com";
 
 let tokens = {};
@@ -40,57 +40,33 @@ const client = new Client({
 // Stabilitás megőrzése
 process.on('unhandledRejection', error => { console.error('Hiba:', error); });
 
-// BEJELENTKEZÉS ÉS AUTOMATIKUS ÜZENET KÜLDÉS
+// --- EZ A RÉSZ FELELŐS AZ AUTOMATIKUS KÜLDÉSÉRT ---
 client.once(Events.ClientReady, async (c) => {
     console.log(`Bejelentkezve: ${c.user.tag}`);
 
     try {
         const channel = await client.channels.fetch(RULES_CHANNEL_ID);
         if (channel) {
-            // Megnézzük az utolsó 10 üzenetet a csatornában
+            // Megnézzük az utolsó üzeneteket, hogy ne küldje el duplán minden újraindításnál
             const messages = await channel.messages.fetch({ limit: 10 });
-            const botSentIt = messages.some(m => m.author.id === client.user.id && m.embeds.length > 0);
+            const alreadySent = messages.some(m => m.author.id === client.user.id);
 
-            if (!botSentIt) {
-                console.log("Szabályzat üzenet nincs a csatornában, küldés...");
-                await sendRules(channel);
+            if (!alreadySent) {
+                console.log("Szabályzat nincs kint, küldés folyamatban...");
+                await sendRulesMessage(channel);
             } else {
                 console.log("A szabályzat üzenet már kint van a csatornában.");
             }
+        } else {
+            console.error("Nem találom a csatornát az adott ID-vel!");
         }
     } catch (error) {
-        console.error("Hiba a szabályzat küldésekor:", error);
+        console.error("Hiba történt az indításkori ellenőrzésnél:", error);
     }
 });
 
-// GOMB KEZELÉS
-client.on(Events.InteractionCreate, async interaction => {
-    if (!interaction.isButton()) return;
-
-    if (interaction.customId === "verify") {
-        try {
-            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
-            if (interaction.member.roles.cache.has(ROLE_ID)) {
-                return await interaction.editReply({ content: "Már elfogadtad a szabályzatot!" });
-            }
-
-            const token = uuidv4();
-            tokens[token] = { userId: interaction.user.id, expires: Date.now() + 5 * 60 * 1000 };
-            const link = `${BASE_URL}/verify/${token}`;
-
-            const embed = new EmbedBuilder()
-                .setTitle("Szabályzat Elfogadása")
-                .setDescription(`Kattints a gombra a szabályzat megnyitásához:\n\n[Megnyitás a böngészőben](${link})`)
-                .setColor("#5865F2");
-
-            await interaction.editReply({ embeds: [embed] });
-        } catch (error) { console.error("Gomb hiba:", error); }
-    }
-});
-
-// A SZABÁLYZAT ÜZENET FORMÁZÁSA (A kért szöveggel)
-async function sendRules(channel) {
+// Függvény a szabályzat formázott beküldéséhez
+async function sendRulesMessage(channel) {
     const embed = new EmbedBuilder()
         .setTitle("Szabályzat")
         .setDescription(
@@ -116,7 +92,35 @@ async function sendRules(channel) {
     await channel.send({ embeds: [embed], components: [row] });
 }
 
-// WEB OLDAL (Hóeséssel)
+// GOMB INTERAKCIÓ KEZELÉSE
+client.on(Events.InteractionCreate, async interaction => {
+    if (!interaction.isButton()) return;
+
+    if (interaction.customId === "verify") {
+        try {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+            if (interaction.member.roles.cache.has(ROLE_ID)) {
+                return await interaction.editReply({ content: "Már elfogadtad a szabályzatot!" });
+            }
+
+            const token = uuidv4();
+            tokens[token] = { userId: interaction.user.id, expires: Date.now() + 5 * 60 * 1000 };
+            const link = `${BASE_URL}/verify/${token}`;
+
+            const embed = new EmbedBuilder()
+                .setTitle("Szabályzat Elfogadása")
+                .setDescription(`Kattints a gombra a szabályzat megtekintéséhez:\n\n[Megnyitás a böngészőben](${link})`)
+                .setColor("#5865F2");
+
+            await interaction.editReply({ embeds: [embed] });
+        } catch (error) {
+            console.error("Gomb hiba:", error);
+        }
+    }
+});
+
+// --- WEB SZERVER ÉS HÓESÉS ---
 app.get('/verify/:token', (req, res) => {
     const data = tokens[req.params.token];
     if (!data || data.expires < Date.now()) return res.send("A link lejárt.");
@@ -130,11 +134,11 @@ app.get('/verify/:token', (req, res) => {
             body { background: #000; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden; }
             .card { background: #11141d; width: 90%; max-width: 500px; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.9); border: 1px solid #222; position: relative; z-index: 10; }
             .header { background: linear-gradient(to bottom, #1d2538, #11141d); padding: 30px; text-align: center; border-bottom: 1px solid #333;}
+            .header h1 { margin: 0; font-size: 24px; color: #fff;}
             .content { padding: 30px; text-align: left; line-height: 1.6; font-size: 14px; color: #ccc; }
             .footer { padding: 20px; background: #0c0f16; text-align: center; display: flex; justify-content: center; gap: 15px; }
             .btn { padding: 12px 35px; border: none; font-size: 15px; cursor: pointer; border-radius: 25px; font-weight: bold; color: white; transition: 0.3s; }
             .btn-accept { background: #28a745; }
-            .btn-deny { background: #dc3545; text-decoration: none; }
             #snow { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
             .snowflake { position: absolute; background-color: white; border-radius: 50%; opacity: 0.8; animation: fall linear infinite; }
             @keyframes fall { to { transform: translateY(100vh); } }
@@ -157,7 +161,6 @@ app.get('/verify/:token', (req, res) => {
             </div>
             <div class="footer">
                 <form action="/accept/${req.params.token}" method="POST" style="margin:0;"><button type="submit" class="btn btn-accept">Elfogadom</button></form>
-                <a href="/deny" class="btn btn-deny"><button class="btn btn-deny" style="padding:0; border:none; background:none; cursor:pointer; color:white; font-weight:bold;">Nem fogadom el</button></a>
             </div>
         </div>
         <script>
@@ -186,12 +189,8 @@ app.post('/accept/:token', async (req, res) => {
         const member = await guild.members.fetch(data.userId);
         await member.roles.add(ROLE_ID);
         delete tokens[req.params.token];
-        res.send("<body style='background:#000;color:white;text-align:center;padding-top:50px;'><h1>Sikeres elfogadás!</h1></body>");
-    } catch (e) { res.send("Hiba történt."); }
-});
-
-app.get('/deny', (req, res) => {
-    res.send("<body style='background:#000;color:white;text-align:center;padding-top:50px;'><h1>Sajnáljuk...</h1></body>");
+        res.send("<body style='background:#000;color:white;text-align:center;padding-top:50px;'><h1>Sikeres elfogadás! Visszatérhetsz Discordra.</h1></body>");
+    } catch (e) { res.send("Hiba történt a rang kiosztásakor."); }
 });
 
 app.listen(PORT, '0.0.0.0', () => { console.log("Web fut a porton:", PORT); });
