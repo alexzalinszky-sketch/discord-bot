@@ -84,7 +84,7 @@ client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isButton()) return;
     if (interaction.customId === "verify") {
         try {
-            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            await interaction.deferReply({ ephemeral: true });
             if (interaction.member.roles.cache.has(ROLE_ID)) {
                 return await interaction.editReply({ content: "Már elfogadtad a szabályzatot!" });
             }
