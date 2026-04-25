@@ -21,8 +21,12 @@ app.use(express.json());
 const PORT = process.env.PORT || 10000;
 const TOKEN = process.env.TOKEN;
 const GUILD_ID = "1484897711663743168";
-const ROLE_ID = "1494281710332940338";
 const RULES_CHANNEL_ID = "1491041943088533605";
+
+// --- RANGOK ---
+const ROLE_ID = "1494281710332940338"; // Első (hitelesített) rang
+const SECOND_ROLE_ID = "1491052815458504894"; // Második rang ID-je
+
 const BASE_URL = "https://documentation-k61j.onrender.com";
 
 let tokens = {};
@@ -43,7 +47,6 @@ process.on('unhandledRejection', error => {
     console.error('Nem várt hiba:', error);
 });
 
-// clientReady használata a ready helyett (v15 kompatibilitás)
 client.once(Events.ClientReady, async (c) => {
     console.log(`Bejelentkezve: ${c.user.tag}`);
 
@@ -82,15 +85,15 @@ client.once(Events.ClientReady, async (c) => {
     } catch (e) { console.error("Csatorna ellenőrzési hiba:", e); }
 });
 
-// INTERAKCIÓ KEZELÉS (Javítva az Unknown Interaction hiba)
+// INTERAKCIÓ KEZELÉS
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isButton()) return;
 
     if (interaction.customId === "verify") {
         try {
-            // 1. Azonnali válasz a Discordnak (Gondolkodik...), így nem jár le a 3 mp-es limit
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+            // Ellenőrizzük, hogy van-e már megadott rangja
             if (interaction.member.roles.cache.has(ROLE_ID)) {
                 return await interaction.editReply({ content: "Már elfogadtad a szabályzatot!" });
             }
@@ -99,17 +102,29 @@ client.on(Events.InteractionCreate, async interaction => {
             tokens[token] = { userId: interaction.user.id, expires: Date.now() + 5 * 60 * 1000 };
             const link = `${BASE_URL}/verify/${token}`;
 
+            // Képen látható új embed kialakítás
             const embed = new EmbedBuilder()
                 .setTitle("Szabályzat Elfogadása")
-                .setDescription(`Kattints a gombra a szabályzat megtekintéséhez és elfogadásához:\n\n[Megnyitás a böngészőben](${link})`)
-                .setColor("#5865F2");
+                .setDescription(
+                    `**Kattints az alábbi gombra a szabályzat megtekintéséhez és elfogadásához:**\n\n` +
+                    `📘 **A gombra kattintva megnyílik a böngésződ**\n` +
+                    `⏰ **A link 5 percig érvényes**\n\n` +
+                    `*Ha nem nyílik meg automatikusan, másold be a linket a böngésződbe:*\n\`${link}\``
+                )
+                .setColor("#2b2d31");
 
-            // 2. Az editReply-t használjuk a deferReply után
-            await interaction.editReply({ embeds: [embed] });
+            // Képen látható Link gomb
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setLabel("SZABÁLYZAT ELFOGADÁSA")
+                    .setURL(link)
+                    .setStyle(ButtonStyle.Link)
+            );
+
+            await interaction.editReply({ embeds: [embed], components: [row] });
 
         } catch (error) {
             console.error("Gomb interakció hiba:", error);
-            // Ha még nem válaszoltunk, megpróbáljuk elküldeni a hibát
             if (interaction.deferred) {
                 await interaction.editReply({ content: "Hiba történt a folyamat során." }).catch(() => {});
             }
@@ -120,59 +135,79 @@ client.on(Events.InteractionCreate, async interaction => {
 // --- WEB SZERVER ---
 app.get('/verify/:token', (req, res) => {
     const data = tokens[req.params.token];
-    if (!data || data.expires < Date.now()) return res.send("A link lejárt vagy érvénytelen.");
+    if (!data || data.expires < Date.now()) return res.send("<body style='background:#0f111a;color:white;text-align:center;margin-top:50px;'><h2>A link lejárt vagy érvénytelen.</h2></body>");
 
-    // Itt a hosszú szabályzatod a HTML-ben...
+    // Képen látható weblap dizájn
     res.send(`
     <html>
     <head>
         <title>Szabályzat</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            body { background: #000; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-            .card { background: #11141d; width: 95%; max-width: 650px; border-radius: 15px; padding: 0; box-shadow: 0 10px 40px rgba(0,0,0,0.9); border: 1px solid #222; overflow: hidden; }
-            .header { background: linear-gradient(to bottom, #1d2538, #11141d); padding: 20px; text-align: center; border-bottom: 1px solid #333;}
-            .content { padding: 25px; line-height: 1.6; font-size: 13px; color: #ccc; max-height: 60vh; overflow-y: auto; }
-            .footer { padding: 20px; background: #0c0f16; text-align: center; border-top: 1px solid #222; }
-            .btn { padding: 12px 40px; border: none; font-size: 16px; cursor: pointer; border-radius: 25px; font-weight: bold; color: white; background: #28a745; transition: 0.3s; }
-            .btn:hover { background: #218838; transform: scale(1.05); }
+            body { 
+                background: #0b0d14 radial-gradient(circle at 50% 50%, #151a28 0%, #0b0d14 100%); 
+                color: #e0e0e0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; 
+            }
+            .card { 
+                background: #11141d; width: 95%; max-width: 700px; border-radius: 12px; 
+                padding: 0; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid #1f2533; overflow: hidden; 
+            }
+            .header { 
+                background: linear-gradient(to bottom, #2b5b84, #182a40); 
+                padding: 30px 20px; text-align: center; border-bottom: 1px solid #2b5b84; 
+            }
+            .header h1 { margin: 0; font-size: 24px; letter-spacing: 2px; color: #ffffff; }
+            .header p { margin: 10px 0 0 0; font-size: 13px; color: #a3c2e0; }
+            .content { padding: 30px; line-height: 1.7; font-size: 14px; max-height: 50vh; overflow-y: auto; }
+            .content h3 { 
+                color: #ffffff; border-left: 4px solid #4791db; padding-left: 10px; margin-top: 0; margin-bottom: 20px; 
+            }
+            .content p { margin-bottom: 10px; }
+            .footer { 
+                padding: 20px; background: #0c0f16; text-align: center; border-top: 1px solid #1f2533; 
+                display: flex; justify-content: center; gap: 20px;
+            }
+            .btn { 
+                padding: 12px 30px; border: none; font-size: 15px; cursor: pointer; 
+                border-radius: 25px; font-weight: bold; color: white; transition: 0.2s; 
+            }
+            .btn-accept { background: #2e8b57; }
+            .btn-accept:hover { background: #3cb371; transform: scale(1.02); }
+            .btn-decline { background: #c62828; }
+            .btn-decline:hover { background: #e53935; transform: scale(1.02); }
+            
+            /* Gördítősáv formázása */
+            ::-webkit-scrollbar { width: 8px; }
+            ::-webkit-scrollbar-track { background: #11141d; }
+            ::-webkit-scrollbar-thumb { background: #2b5b84; border-radius: 10px; }
+            ::-webkit-scrollbar-thumb:hover { background: #4791db; }
         </style>
     </head>
     <body>
         <div class="card">
-            <div class="header"><h1>SZABÁLYZATUNK</h1></div>
+            <div class="header">
+                <h1>SZABÁLYZATUNK</h1>
+                <p>Kérlek olvasd el figyelmesen!</p>
+            </div>
             <div class="content">
                 <h3>Discord Szabályzatunk</h3>
-                1. Légy tisztelettudó!<br>
-                2. Nincs gyűlöletbeszéd!<br>
-                3. Tilos a spamelés!<br>
-                4. Reklám csak engedéllyel!<br>
-                5. Tartsd be a csatornák témáját!<br>
-                6. Ne ossz meg személyes adatokat!<br>
-                7. Tartalomkorlátozás (18+ tilos)!<br>
-                8. Kövesd a moderátorokat!<br>
-                9. Ne élj vissza a botokkal!<br>
-                10. A jó hangulat közös felelősség!<br>
-                11. A Tulajdonos pingelése TILOS!<br>
-                12. Külső tradekért nem vállalunk felelősséget!<br>
-                13. Ne használj provokatív nevet!<br>
-                14. Kulturált hangcsatorna használat!<br>
-                15. DM spam tilos!<br>
-                <hr>
-                <h3>Roblox Szabályzatunk</h3>
-                1. Tisztelet minden játékosnak!<br>
-                2. Csalás/Exploit tilos!<br>
-                3. Ne rontsd más játékát!<br>
-                4. Chat spam tilos!<br>
-                5. Adatvédelem!<br>
-                6. Reklám tilos!<br>
-                7. Moderátorok követése!<br>
-                8. Nem megfelelő tartalom tilos!<br>
-                9. Szabályszegés tiltást von maga után!
+                <p>1. Légy tisztelettudó! Minden taggal kulturáltan és tiszteletteljesen kommunikálj. A sértegetés, gyűlölködés, bántalmazó viselkedés vagy bárminemű zaklatás szigorúan tilos.</p>
+                <p>2. Nincs gyűlöletbeszéd vagy diszkrimináció! Tilos bármilyen rasszista, szexista, homofób, vallási vagy más sértő megnyilvánulás. Mindenkit egyenlően kezelünk.</p>
+                <p>3. Tilos a spamelés és floodolás! Indokolatlan, ismétlődő üzenetek, karakterek, linkek vagy említések halmozása nem megengedett.</p>
+                <p>4. Reklám és önpromóció csak engedéllyel! Más Discord szerverek, csatornák, oldalak vagy szolgáltatások hirdetése kizárólag az adminisztrátorok előzetes engedélyével engedélyezett.</p>
+                <p>5. Tartsd be a csatornák témáját! Mindig az adott csatorna témájához kapcsolódj. Off-topic beszélgetések csak a kijelölt helyen folytathatók.</p>
+                <p>6. Ne ossz meg személyes adatokat! Szigorúan tilos saját vagy más személyek adatait (név, cím, telefonszám, jelszó stb.) nyilvánosan megosztani.</p>
+                <p>7. Tartalomkorlátozás! Tilos bármilyen 18+, erőszakos, jogsértő vagy illegális tartalom megosztása.</p>
+                <p>8. Kövesd az adminok és moderátorok utasításait! A szabályok betartatása az ő feladatuk. A döntésüket tiszteletben kell tartani.</p>
+                <p>9. Ne élj vissza a botokkal és funkciókkal! A botok és szerver funkciók szándékos túlterhelése, spammelése vagy szabotálása tilos.</p>
             </div>
             <div class="footer">
                 <form action="/accept/${req.params.token}" method="POST">
-                    <button type="submit" class="btn">Elfogadom</button>
+                    <button type="submit" class="btn btn-accept">Elfogadom</button>
+                </form>
+                <form action="/decline/${req.params.token}" method="POST">
+                    <button type="submit" class="btn btn-decline">Nem fogadom el</button>
                 </form>
             </div>
         </div>
@@ -181,15 +216,17 @@ app.get('/verify/:token', (req, res) => {
     `);
 });
 
+// Elfogadás végpont - KÉT RANG KIOSZTÁSA
 app.post('/accept/:token', async (req, res) => {
     const data = tokens[req.params.token];
-    if (!data) return res.send("Hiba: Érvénytelen munkamenet.");
+    if (!data) return res.send("<body style='background:#0f111a;color:white;text-align:center;margin-top:50px;'><h2>Hiba: Érvénytelen vagy lejárt munkamenet.</h2></body>");
 
     try {
         const guild = await client.guilds.fetch(GUILD_ID);
         const member = await guild.members.fetch(data.userId);
         
-        await member.roles.add(ROLE_ID);
+        // --- ITT ADJA HOZZÁ A KÉT RANGOT ---
+        await member.roles.add([ROLE_ID, SECOND_ROLE_ID]);
         
         // DM küldése
         await member.send("✅ **Sikeresen elfogadtad a szabályzatot!**\nKöszönjük a jelentkezésedet, jó szórakozást a szerveren!").catch(() => {
@@ -197,11 +234,29 @@ app.post('/accept/:token', async (req, res) => {
         });
 
         delete tokens[req.params.token];
-        res.send("<html><body style='background:#000;color:#28a745;text-align:center;padding-top:50px;font-family:sans-serif;'><h1>Sikeresen elfogadtad!</h1><p style='color:white;'>Most már bezárhatod ezt az ablakot.</p></body></html>");
+        res.send(`
+        <html lang="hu">
+            <body style='background:#0b0d14;color:#3cb371;text-align:center;padding-top:100px;font-family:sans-serif;'>
+                <h2>Sikeresen elfogadtad a szabályzatot!</h2>
+                <p style='color:#ccc;'>A rangjaid kiosztásra kerültek. Most már bezárhatod ezt az ablakot.</p>
+            </body>
+        </html>`);
     } catch (e) {
         console.error("Hiba a rang kiosztásakor:", e);
-        res.send("Hiba történt a rang kiosztása közben. Kérlek jelezd egy adminnak!");
+        res.send("<body style='background:#0f111a;color:#e53935;text-align:center;margin-top:50px;'><h2>Hiba történt a rang kiosztása közben. Kérlek jelezd egy adminnak!</h2></body>");
     }
+});
+
+// Elutasítás végpont
+app.post('/decline/:token', (req, res) => {
+    delete tokens[req.params.token]; // Token törlése
+    res.send(`
+    <html lang="hu">
+        <body style='background:#0b0d14;color:#e53935;text-align:center;padding-top:100px;font-family:sans-serif;'>
+            <h2>Elutasítottad a szabályzatot.</h2>
+            <p style='color:#ccc;'>Nem kaptál rangot. Ha megváltoztatod a döntésed, kérj új linket a szerveren.</p>
+        </body>
+    </html>`);
 });
 
 app.listen(PORT, '0.0.0.0', () => {
