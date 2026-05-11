@@ -253,245 +253,88 @@ app.post('/decline/:token', (req, res) => {
     delete tokens[req.params.token];
 
     res.send(`
-<style>
+app.post('/decline/:token', (req, res) => {
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    delete tokens[req.params.token];
 
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-}
+    res.send(`
+    <html lang="hu">
+    <head>
+        <meta charset="UTF-8">
+        <title>Elutasítva</title>
 
-body{
-    min-height:100vh;
+        <style>
 
-    display:flex;
-    justify-content:center;
-    align-items:center;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-    overflow:hidden;
+        *{
+            margin:0;
+            padding:0;
+            box-sizing:border-box;
+        }
 
-    font-family:'Inter',sans-serif;
+        body{
+            min-height:100vh;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            overflow:hidden;
+            font-family:'Inter',sans-serif;
 
-    background:
-    radial-gradient(circle at top left,#2563eb 0%,transparent 30%),
-    radial-gradient(circle at bottom right,#7c3aed 0%,transparent 30%),
-    linear-gradient(135deg,#020617,#0f172a);
+            background:
+            radial-gradient(circle at top left,#2563eb 0%,transparent 30%),
+            radial-gradient(circle at bottom right,#7c3aed 0%,transparent 30%),
+            linear-gradient(135deg,#020617,#0f172a);
 
-    color:white;
+            color:white;
+        }
 
-    position:relative;
-}
+        .card{
+            width:95%;
+            max-width:650px;
 
-/* Animated background */
+            padding:60px;
 
-body::before{
-    content:"";
+            border-radius:35px;
 
-    position:absolute;
+            background:rgba(15,23,42,0.72);
 
-    width:700px;
-    height:700px;
+            border:1px solid rgba(255,255,255,0.08);
 
-    background:
-    radial-gradient(circle,#3b82f6 0%,transparent 70%);
+            backdrop-filter:blur(22px);
 
-    opacity:0.15;
+            text-align:center;
+        }
 
-    top:-200px;
-    left:-200px;
+        h2{
+            font-size:42px;
+            margin-bottom:20px;
+        }
 
-    animation:float 8s ease-in-out infinite;
-}
+        p{
+            color:#cbd5e1;
+            line-height:1.8;
+        }
 
-body::after{
-    content:"";
+        </style>
+    </head>
 
-    position:absolute;
+    <body>
 
-    width:600px;
-    height:600px;
+        <div class="card">
+            <h2>Szabályzat elutasítva</h2>
 
-    background:
-    radial-gradient(circle,#8b5cf6 0%,transparent 70%);
+            <p>
+                Nem fogadtad el a szabályzatot,
+                ezért nem kaptál hozzáférést a szerverhez.
+            </p>
+        </div>
 
-    opacity:0.12;
+    </body>
+    </html>
+    `);
 
-    bottom:-200px;
-    right:-200px;
-
-    animation:float2 10s ease-in-out infinite;
-}
-
-@keyframes float{
-    0%{transform:translateY(0px);}
-    50%{transform:translateY(30px);}
-    100%{transform:translateY(0px);}
-}
-
-@keyframes float2{
-    0%{transform:translateY(0px);}
-    50%{transform:translateY(-30px);}
-    100%{transform:translateY(0px);}
-}
-
-.card{
-    position:relative;
-    z-index:10;
-
-    width:95%;
-    max-width:650px;
-
-    padding:60px;
-
-    border-radius:35px;
-
-    background:
-    rgba(15,23,42,0.72);
-
-    border:
-    1px solid rgba(255,255,255,0.08);
-
-    backdrop-filter:blur(22px);
-
-    box-shadow:
-    0 25px 80px rgba(0,0,0,0.65),
-    inset 0 1px 0 rgba(255,255,255,0.05);
-
-    text-align:center;
-
-    animation:cardEnter 0.7s ease;
-}
-
-@keyframes cardEnter{
-    from{
-        opacity:0;
-        transform:translateY(30px) scale(0.95);
-    }
-
-    to{
-        opacity:1;
-        transform:translateY(0px) scale(1);
-    }
-}
-
-.icon{
-    width:110px;
-    height:110px;
-
-    margin:auto;
-    margin-bottom:30px;
-
-    border-radius:50%;
-
-    display:flex;
-    justify-content:center;
-    align-items:center;
-
-    font-size:50px;
-
-    background:
-    linear-gradient(
-        135deg,
-        #ef4444,
-        #dc2626
-    );
-
-    box-shadow:
-    0 0 50px rgba(239,68,68,0.45);
-}
-
-h2{
-    font-size:42px;
-
-    font-weight:800;
-
-    margin-bottom:20px;
-
-    letter-spacing:-1px;
-
-    background:
-    linear-gradient(to right,#ffffff,#fca5a5);
-
-    -webkit-background-clip:text;
-    -webkit-text-fill-color:transparent;
-}
-
-.subtitle{
-    font-size:18px;
-
-    color:#cbd5e1;
-
-    line-height:1.9;
-
-    margin-bottom:35px;
-}
-
-.info-box{
-    background:
-    rgba(255,255,255,0.03);
-
-    border:
-    1px solid rgba(255,255,255,0.05);
-
-    border-radius:22px;
-
-    padding:22px;
-
-    margin-top:15px;
-
-    color:#94a3b8;
-
-    font-size:15px;
-
-    line-height:1.8;
-
-    transition:0.25s;
-}
-
-.info-box:hover{
-    transform:translateY(-2px);
-
-    background:
-    rgba(255,255,255,0.05);
-}
-
-.glow{
-    position:absolute;
-
-    inset:0;
-
-    border-radius:35px;
-
-    padding:1px;
-
-    background:
-    linear-gradient(
-        135deg,
-        rgba(59,130,246,0.4),
-        rgba(139,92,246,0.3),
-        rgba(239,68,68,0.4)
-    );
-
-    -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-
-    -webkit-mask-composite:xor;
-
-    pointer-events:none;
-}
-
-.footer{
-    margin-top:35px;
-
-    font-size:13px;
-
-    color:#64748b;
-}
-
-</style>
+});
 
 // =========================
 // WEBSERVER
