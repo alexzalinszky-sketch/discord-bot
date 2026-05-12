@@ -253,11 +253,6 @@ app.post('/decline/:token', (req, res) => {
     delete tokens[req.params.token];
 
     res.send(`
-app.post('/decline/:token', (req, res) => {
-
-    delete tokens[req.params.token];
-
-    res.send(`
     <html lang="hu">
     <head>
         <meta charset="UTF-8">
@@ -357,10 +352,6 @@ client.login(TOKEN).catch(err => {
 // =========================
 
 // Nem kezelt hibák
-process.on('uncaughtException', (err) => {
-    console.error('❌ UNCAUGHT EXCEPTION:', err);
-});
-
 process.on('unhandledRejection', (reason) => {
     console.error('❌ UNHANDLED REJECTION:', reason);
 });
@@ -372,15 +363,6 @@ client.on('error', (err) => {
 
 client.on('shardError', (err) => {
     console.error('❌ SHARD ERROR:', err);
-});
-
-// Auto reconnect
-client.on('disconnect', () => {
-
-    console.log("⚠️ Bot disconnected. Reconnecting...");
-
-    client.login(TOKEN).catch(console.error);
-
 });
 
 // Keep alive
