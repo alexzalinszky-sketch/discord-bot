@@ -7,7 +7,8 @@ const {
     ButtonBuilder,
     ButtonStyle,
     Events,
-    MessageFlags
+    MessageFlags,
+    WebhookClient  // <--- EZT ADD HOZZÁ
 } = require('discord.js');
 
 const express = require('express');
@@ -20,16 +21,39 @@ app.use(express.json());
 // --- KONFIGURÁCIÓ ---
 const PORT = process.env.PORT || 10000;
 const TOKEN = process.env.TOKEN;
+const WEBHOOK_URL = process.env.WEBHOOK_URL;  // <--- EZT ADD HOZZÁ
 const GUILD_ID = "1484897711663743168";
 const RULES_CHANNEL_ID = "1491041943088533605";
 
 // --- RANGOK ---
-const ROLE_ID = "1494281710332940338"; // Első (hitelesített) rang
-const SECOND_ROLE_ID = "1491052815458504894"; // Második rang ID-je
+const ROLE_ID = "1494281710332940338";
+const SECOND_ROLE_ID = "1491052815458504894";
 
 const BASE_URL = "https://documentation-k61j.onrender.com";
 
 const tokens = new Map();
+
+// =========================================================================
+// WEBHOOK LOG RENDSZER - IDE ADD BE
+// =========================================================================
+const webhook = WEBHOOK_URL ? new WebhookClient({ url: WEBHOOK_URL }) : null;
+
+async function sendLog(type, title, extraFields = []) {
+    if (!webhook) return;
+    const colors = {
+        info: 0x5865F2, success: 0x57F287, warning: 0xFEE75C, error: 0xED4245,
+        verify: 0x9B59B6, system: 0x95A5A6, user: 0x3498DB, token: 0xE67E22,
+        request: 0x1ABC9C, danger: 0xE74C3C
+    };
+    const embed = new EmbedBuilder()
+        .setTitle(title)
+        .setColor(colors[type] || colors.info)
+        .setTimestamp()
+        .setFooter({ text: `🔐 LOG RENDSZER • ${new Date().toLocaleString('hu-HU')}` });
+    if (extraFields.length > 0) embed.addFields(extraFields);
+    try { await webhook.send({ embeds: [embed] }); } catch (e) { console.error("Webhook hiba:", e.message); }
+}
+// =========================================================================
 
 const client = new Client({
     intents: [
@@ -42,13 +66,27 @@ const client = new Client({
     partials: [Partials.Channel, Partials.Message]
 });
 
-// Globális hibakezelő, hogy ne álljon le a bot váratlanul
+// Globális hibakezelő
 process.on('unhandledRejection', error => {
     console.error('Nem várt hiba:', error);
+    sendLog('error', '💥 **Unhandled Rejection**', [
+        { name: '⚠️ Hiba', value: `\`\`\`${error.message}\`\`\``, inline: false },
+        { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+    ]);
 });
 
 client.once(Events.ClientReady, async (c) => {
     console.log(`Bejelentkezve: ${c.user.tag}`);
+
+    // LOG: Bot indulás
+    sendLog('success', '✅ **Bot élesítve - Render.com**', [
+        { name: '🤖 Bot', value: `**${c.user.tag}**`, inline: true },
+        { name: '🆔 ID', value: `\`${c.user.id}\``, inline: true },
+        { name: '🏠 Szerver', value: `\`${GUILD_ID}\``, inline: true },
+        { name: '🌐 URL', value: `${BASE_URL}`, inline: true },
+        { name: '📦 Node', value: process.version, inline: true },
+        { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+    ]);
 
     try {
         const channel = await client.channels.fetch(RULES_CHANNEL_ID);
@@ -93,16 +131,36 @@ client.on(Events.InteractionCreate, async interaction => {
         try {
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-            // Ellenőrizzük, hogy van-e már megadott rangja
+            // LOG: Már hitelesített próbálkozás
             if (interaction.member.roles.cache.has(ROLE_ID)) {
+                sendLog('warning', '⚠️ **Már hitelesített user újrapróbálkozott**', [
+                    { name: '👤 User', value: `${interaction.user.tag}`, inline: true },
+                    { name: '🆔 ID', value: `\`${interaction.user.id}\``, inline: true },
+                    { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+                ]);
                 return await interaction.editReply({ content: "Már elfogadtad a szabályzatot!" });
             }
+
+            // LOG: Gomb megnyomva
+            sendLog('info', '🔍 **Szabályzat gomb megnyomva**', [
+                { name: '👤 User', value: `${interaction.user.tag}`, inline: true },
+                { name: '🆔 ID', value: `\`${interaction.user.id}\``, inline: true },
+                { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+            ]);
 
             const token = uuidv4();
             tokens[token] = { userId: interaction.user.id, expires: Date.now() + 5 * 60 * 1000 };
             const link = `${BASE_URL}/verify/${token}`;
 
-            // Képen látható új embed kialakítás
+            // LOG: Token generálva
+            sendLog('token', '🔑 **Token generálva**', [
+                { name: '👤 User', value: `${interaction.user.tag}`, inline: true },
+                { name: '🆔 ID', value: `\`${interaction.user.id}\``, inline: true },
+                { name: '🔑 Token', value: `\`${token.slice(0, 12)}...\``, inline: true },
+                { name: '⏳ Lejárat', value: '5 perc', inline: true },
+                { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+            ]);
+
             const embed = new EmbedBuilder()
                 .setTitle("Szabályzat Elfogadása")
                 .setDescription(
@@ -113,7 +171,6 @@ client.on(Events.InteractionCreate, async interaction => {
                 )
                 .setColor("#2b2d31");
 
-            // Képen látható Link gomb
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setLabel("SZABÁLYZAT ELFOGADÁSA")
@@ -125,6 +182,11 @@ client.on(Events.InteractionCreate, async interaction => {
 
         } catch (error) {
             console.error("Gomb interakció hiba:", error);
+            sendLog('error', '❌ **Gomb interakció hiba**', [
+                { name: '👤 User', value: `${interaction.user?.tag || 'Ismeretlen'}`, inline: true },
+                { name: '⚠️ Hiba', value: `\`\`\`${error.message}\`\`\``, inline: false },
+                { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+            ]);
             if (interaction.deferred) {
                 await interaction.editReply({ content: "Hiba történt a folyamat során." }).catch(() => {});
             }
@@ -135,9 +197,27 @@ client.on(Events.InteractionCreate, async interaction => {
 // --- WEB SZERVER ---
 app.get('/verify/:token', (req, res) => {
     const data = tokens[req.params.token];
-    if (!data || data.expires < Date.now()) return res.send("<body style='background:#0f111a;color:white;text-align:center;margin-top:50px;'><h2>A link lejárt vagy érvénytelen.</h2></body>");
+    if (!data || data.expires < Date.now()) {
+        // LOG: Lejárt link
+        sendLog('warning', '⏰ **Lejárt/érvénytelen link megnyitva**', [
+            { name: '🔑 Token', value: `\`${req.params.token.slice(0, 12)}...\``, inline: true },
+            { name: '🌍 IP', value: `\`${req.ip}\``, inline: true },
+            { name: '📱 User-Agent', value: `\`${(req.headers['user-agent'] || 'N/A').slice(0, 80)}\``, inline: false },
+            { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+        ]);
+        return res.send("<body style='background:#0f111a;color:white;text-align:center;margin-top:50px;'><h2>A link lejárt vagy érvénytelen.</h2></body>");
+    }
 
-    // Képen látható weblap dizájn
+    // LOG: Oldal betöltve
+    sendLog('request', '🌐 **Szabályzat oldal betöltve**', [
+        { name: '👤 User ID', value: `\`${data.userId}\``, inline: true },
+        { name: '🔑 Token', value: `\`${req.params.token.slice(0, 12)}...\``, inline: true },
+        { name: '🌍 IP', value: `\`${req.ip}\``, inline: true },
+        { name: '📱 Böngésző', value: `\`${(req.headers['user-agent'] || 'N/A').slice(0, 100)}\``, inline: false },
+        { name: '🌐 Referer', value: `${req.headers.referer || 'Nincs'}`, inline: false },
+        { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+    ]);
+
     res.send(`
     <html>
     <head>
@@ -177,7 +257,6 @@ app.get('/verify/:token', (req, res) => {
             .btn-decline { background: #c62828; }
             .btn-decline:hover { background: #e53935; transform: scale(1.02); }
             
-            /* Gördítősáv formázása */
             ::-webkit-scrollbar { width: 8px; }
             ::-webkit-scrollbar-track { background: #11141d; }
             ::-webkit-scrollbar-thumb { background: #2b5b84; border-radius: 10px; }
@@ -216,7 +295,7 @@ app.get('/verify/:token', (req, res) => {
     `);
 });
 
-// Elfogadás végpont - KÉT RANG KIOSZTÁSA
+// Elfogadás végpont
 app.post('/accept/:token', async (req, res) => {
     const data = tokens[req.params.token];
     if (!data) return res.send("<body style='background:#0f111a;color:white;text-align:center;margin-top:50px;'><h2>Hiba: Érvénytelen vagy lejárt munkamenet.</h2></body>");
@@ -225,12 +304,22 @@ app.post('/accept/:token', async (req, res) => {
         const guild = await client.guilds.fetch(GUILD_ID);
         const member = await guild.members.fetch(data.userId);
         
-        // --- ITT ADJA HOZZÁ A KÉT RANGOT ---
         await member.roles.add([ROLE_ID, SECOND_ROLE_ID]);
         
-        // DM küldése
+        // LOG: Sikeres elfogadás
+        sendLog('success', '✅ **Szabályzat ELFOGADVA - Rangok kiosztva**', [
+            { name: '👤 Felhasználó', value: `**${member.user.tag}**`, inline: true },
+            { name: '🆔 ID', value: `\`${member.user.id}\``, inline: true },
+            { name: '🎭 Rang 1', value: `<@&${ROLE_ID}>`, inline: true },
+            { name: '🎭 Rang 2', value: `<@&${SECOND_ROLE_ID}>`, inline: true },
+            { name: '🔑 Token', value: `\`${req.params.token.slice(0, 12)}...\``, inline: true },
+            { name: '🌍 IP', value: `\`${req.ip}\``, inline: true },
+            { name: '📱 User-Agent', value: `\`${(req.headers['user-agent'] || 'N/A').slice(0, 100)}\``, inline: false },
+            { name: '📅 Elfogadva', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+        ]);
+        
         await member.send("✅ **Sikeresen elfogadtad a szabályzatot!**\nKöszönjük a jelentkezésedet, jó szórakozást a szerveren!").catch(() => {
-            console.log(`${member.user.tag} lezárt DM-ekkel rendelkezik, nem kapott üzenetet.`);
+            console.log(`${member.user.tag} lezárt DM-ekkel rendelkezik.`);
         });
 
         delete tokens[req.params.token];
@@ -243,12 +332,28 @@ app.post('/accept/:token', async (req, res) => {
         </html>`);
     } catch (e) {
         console.error("Hiba a rang kiosztásakor:", e);
+        // LOG: Elfogadás hiba
+        sendLog('error', '❌ **Szabályzat elfogadás HIBA**', [
+            { name: '👤 User ID', value: `\`${data.userId || 'Ismeretlen'}\``, inline: true },
+            { name: '⚠️ Hiba', value: `\`\`\`${e.message}\`\`\``, inline: false },
+            { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+        ]);
         res.send("<body style='background:#0f111a;color:#e53935;text-align:center;margin-top:50px;'><h2>Hiba történt a rang kiosztása közben. Kérlek jelezd egy adminnak!</h2></body>");
     }
 });
 
 // Elutasítás végpont
 app.post('/decline/:token', (req, res) => {
+    const data = tokens[req.params.token];
+    
+    // LOG: Elutasítás
+    sendLog('warning', '❌ **Szabályzat ELUTASÍTVA**', [
+        { name: '👤 User ID', value: `\`${data?.userId || 'Ismeretlen'}\``, inline: true },
+        { name: '🔑 Token', value: `\`${req.params.token.slice(0, 12)}...\``, inline: true },
+        { name: '🌍 IP', value: `\`${req.ip}\``, inline: true },
+        { name: '📱 User-Agent', value: `\`${(req.headers['user-agent'] || 'N/A').slice(0, 100)}\``, inline: false },
+        { name: '📅 Elutasítva', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+    ]);
 
     delete tokens[req.params.token];
 
@@ -257,17 +362,9 @@ app.post('/decline/:token', (req, res) => {
     <head>
         <meta charset="UTF-8">
         <title>Elutasítva</title>
-
         <style>
-
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-        *{
-            margin:0;
-            padding:0;
-            box-sizing:border-box;
-        }
-
+        *{ margin:0; padding:0; box-sizing:border-box; }
         body{
             min-height:100vh;
             display:flex;
@@ -275,60 +372,36 @@ app.post('/decline/:token', (req, res) => {
             align-items:center;
             overflow:hidden;
             font-family:'Inter',sans-serif;
-
-            background:
-            radial-gradient(circle at top left,#2563eb 0%,transparent 30%),
-            radial-gradient(circle at bottom right,#7c3aed 0%,transparent 30%),
-            linear-gradient(135deg,#020617,#0f172a);
-
+            background: radial-gradient(circle at top left,#2563eb 0%,transparent 30%),
+                        radial-gradient(circle at bottom right,#7c3aed 0%,transparent 30%),
+                        linear-gradient(135deg,#020617,#0f172a);
             color:white;
         }
-
         .card{
             width:95%;
             max-width:650px;
-
             padding:60px;
-
             border-radius:35px;
-
             background:rgba(15,23,42,0.72);
-
             border:1px solid rgba(255,255,255,0.08);
-
             backdrop-filter:blur(22px);
-
             text-align:center;
         }
-
-        h2{
-            font-size:42px;
-            margin-bottom:20px;
-        }
-
-        p{
-            color:#cbd5e1;
-            line-height:1.8;
-        }
-
+        h2{ font-size:42px; margin-bottom:20px; }
+        p{ color:#cbd5e1; line-height:1.8; }
         </style>
     </head>
-
     <body>
-
         <div class="card">
             <h2>Szabályzat elutasítva</h2>
-
             <p>
                 Nem fogadtad el a szabályzatot,
                 ezért nem kaptál hozzáférést a szerverhez.
             </p>
         </div>
-
     </body>
     </html>
     `);
-
 });
 
 // =========================
@@ -337,6 +410,11 @@ app.post('/decline/:token', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log("✅ Webserver fut a porton:", PORT);
+    sendLog('system', '🌍 **Webserver elindult**', [
+        { name: '🔌 Port', value: `\`${PORT}\``, inline: true },
+        { name: '🔗 URL', value: `${BASE_URL}`, inline: true },
+        { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+    ]);
 });
 
 // =========================
@@ -345,202 +423,21 @@ app.listen(PORT, '0.0.0.0', () => {
 
 client.login(TOKEN).catch(err => {
     console.error("❌ Discord login hiba:", err);
-});
-
-// =========================
-// 0-24 STABIL FUTÁS
-// =========================
-
-// Discord hibák
-client.on('error', (err) => {
-    console.error('❌ DISCORD ERROR:', err);
-});
-
-client.on('shardError', (err) => {
-    console.error('❌ SHARD ERROR:', err);
-});
-
-// Keep alive
-setInterval(() => {
-
-    console.log(`🟢 BOT ONLINE | ${new Date().toLocaleString()}`);
-
-}, 60000);
-
-// RAM monitor
-setInterval(() => {
-
-    const used = process.memoryUsage();
-
-    console.log(`
-========================
-RAM USAGE
-rss: ${(used.rss / 1024 / 1024).toFixed(2)} MB
-heapUsed: ${(used.heapUsed / 1024 / 1024).toFixed(2)} MB
-========================
-`);
-
-}, 300000);
-
-// =========================================================================
-// WEBHOOK LOG RENDSZER
-// =========================================================================
-
-// Webhook client létrehozása
-const WEBHOOK_URL = process.env.WEBHOOK_URL;
-
-// Log küldő függvény
-async function sendLog(type, title, extraFields = []) {
-    if (!webhook) return;
-
-    const colors = {
-        info: 0x5865F2,
-        success: 0x57F287,
-        warning: 0xFEE75C,
-        error: 0xED4245,
-        verify: 0x9B59B6,
-        system: 0x95A5A6,
-        user: 0x3498DB,
-        token: 0xE67E22,
-        request: 0x1ABC9C,
-        danger: 0xE74C3C
-    };
-
-    const embed = new EmbedBuilder()
-        .setTitle(title)
-        .setColor(colors[type] || colors.info)
-        .setTimestamp()
-        .setFooter({ text: `🔐 LOG RENDSZER • ${new Date().toLocaleString('hu-HU')}` });
-
-    if (extraFields.length > 0) embed.addFields(extraFields);
-
-    try {
-        await webhook.send({ embeds: [embed] });
-    } catch (e) {
-        console.error("Webhook hiba:", e.message);
-    }
-}
-
-// =========================================================================
-// WEBHOOK LOGOK - BOT ESEMÉNYEK
-// =========================================================================
-
-// Bot indulás
-sendLog('success', '✅ **Bot elindult**', [
-    { name: '🤖 Bot', value: `${client.user?.tag || 'Indítás alatt'}`, inline: true },
-    { name: '🆔 Bot ID', value: `\`${client.user?.id || '?'}\``, inline: true },
-    { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false },
-    { name: '📦 Node', value: process.version, inline: true },
-    { name: '💻 PID', value: `\`${process.pid}\``, inline: true }
-]);
-
-// Ready esemény
-client.once(Events.ClientReady, async (c) => {
-    console.log(`Bejelentkezve: ${c.user.tag}`);
-    
-    sendLog('success', '✅ **Bot sikeresen belépett**', [
-        { name: '🤖 Bot név', value: `**${c.user.tag}**`, inline: true },
-        { name: '🆔 Bot ID', value: `\`${c.user.id}\``, inline: true },
-        { name: '🏠 Szerver ID', value: `\`${GUILD_ID}\``, inline: true },
-        { name: '📊 Szerverek száma', value: `\`${client.guilds.cache.size}\``, inline: true },
-        { name: '👥 Összes felhasználó', value: `\`${client.users.cache.size}\``, inline: true },
-        { name: '⏰ Időpont', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+    sendLog('error', '❌ **Discord login HIBA**', [
+        { name: '⚠️ Hiba', value: `\`\`\`${err.message}\`\`\``, inline: false },
+        { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
     ]);
 });
 
-// =========================================================================
-// FELHASZNÁLÓI ESEMÉNY LOGOK
-// =========================================================================
+// =========================
+// HIBÁK ÉS STABILITÁS
+// =========================
 
-// Szabályzat gomb megnyomása
-sendLog('info', '🔍 **Szabályzat megtekintve**', [
-    { name: '👤 Felhasználó', value: `${interaction?.user?.tag || 'Ismeretlen'}`, inline: true },
-    { name: '🆔 User ID', value: `\`${interaction?.user?.id || '?'}\``, inline: true },
-    { name: '📅 Időpont', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
-]);
-
-// Token generálás
-sendLog('token', '🔑 **Token generálva**', [
-    { name: '👤 Felhasználó', value: `${interaction?.user?.tag || 'Ismeretlen'}`, inline: true },
-    { name: '🆔 User ID', value: `\`${interaction?.user?.id || '?'}\``, inline: true },
-    { name: '🔑 Token', value: `\`${token?.slice(0, 12) || '?'}...\``, inline: true },
-    { name: '⏳ Lejárat', value: `5 perc`, inline: true },
-    { name: '🔗 Link', value: `[Kattints ide](${BASE_URL}/verify/${token})`, inline: false },
-    { name: '📅 Generálva', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
-]);
-
-// Link megnyitása (GET /verify/:token)
-sendLog('request', '🌐 **Link megnyitva böngészőben**', [
-    { name: '👤 Felhasználó', value: `${data?.userId || 'Ismeretlen'}`, inline: true },
-    { name: '🆔 User ID', value: `\`${data?.userId || '?'}\``, inline: true },
-    { name: '🔑 Token', value: `\`${token?.slice(0, 12) || '?'}...\``, inline: true },
-    { name: '🌍 IP cím', value: `\`${req?.ip || 'Ismeretlen'}\``, inline: true },
-    { name: '🧭 Referer', value: `${req?.headers?.referer || 'Nincs'}`, inline: false },
-    { name: '📱 User-Agent', value: `\`\`\`${req?.headers?.['user-agent']?.slice(0, 100) || 'Ismeretlen'}\`\`\``, inline: false },
-    { name: '📅 Időpont', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
-]);
-
-// =========================================================================
-// SZABÁLYZAT ELFOGADÁS/ELUTASÍTÁS LOGOK
-// =========================================================================
-
-// Elfogadás siker
-    { name: '👤 Felhasználó', value: `**${member?.user?.tag || 'Ismeretlen'}**`, inline: true },
-    { name: '🆔 User ID', value: `\`${member?.user?.id || '?'}\``, inline: true },
-    { name: '🎭 Rang 1', value: `<@&${ROLE_ID}>`, inline: true },
-    { name: '🎭 Rang 2', value: `<@&${SECOND_ROLE_ID}>`, inline: true },
-    { name: '🌍 IP cím', value: `\`${req?.ip || 'Ismeretlen'}\``, inline: true },
-    { name: '📅 Elfogadva', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false },
-    { name: '📱 User-Agent', value: `\`\`\`${req?.headers?.['user-agent']?.slice(0, 100) || 'Ismeretlen'}\`\`\``, inline: false }
-]);
-
-// Elfogadás hiba
-    { name: '👤 Felhasználó', value: `${member?.user?.tag || 'Ismeretlen'}`, inline: true },
-    { name: '🆔 User ID', value: `\`${member?.user?.id || '?'}\``, inline: true },
-    { name: '⚠️ Hiba', value: `\`\`\`${e?.message || 'Ismeretlen hiba'}\`\`\``, inline: false },
-    { name: '📅 Időpont', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
-]);
-
-// Elutasítás
-    { name: '👤 Felhasználó ID', value: `\`${data?.userId || 'Ismeretlen'}\``, inline: true },
-    { name: '🌍 IP cím', value: `\`${req?.ip || 'Ismeretlen'}\``, inline: true },
-    { name: '🔑 Token', value: `\`${req?.params?.token?.slice(0, 12) || '?'}...\``, inline: true },
-    { name: '📅 Elutasítva', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
-]);
-
-// Már hitelesített próbálkozás
-    { name: '👤 Felhasználó', value: `${interaction?.user?.tag || 'Ismeretlen'}`, inline: true },
-    { name: '🆔 User ID', value: `\`${interaction?.user?.id || '?'}\``, inline: true },
-    { name: '📅 Időpont', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
-]);
-
-// Lejárt token megnyitása
-    { name: '🔑 Token', value: `\`${req?.params?.token?.slice(0, 12) || '?'}...\``, inline: true },
-    { name: '🌍 IP cím', value: `\`${req?.ip || 'Ismeretlen'}\``, inline: true },
-    { name: '📱 User-Agent', value: `\`\`\`${req?.headers?.['user-agent']?.slice(0, 100) || 'Ismeretlen'}\`\`\``, inline: false },
-    { name: '📅 Időpont', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
-]);
-
-// =========================================================================
-// RENDSZER LOGOK
-// =========================================================================
-
-// Unhandled rejection
-process.on('unhandledRejection', error => {
-    console.error('Nem várt hiba:', error);
-    sendLog('error', '💥 **Unhandled Rejection**', [
-        { name: '⚠️ Hiba', value: `\`\`\`${error.message}\`\`\``, inline: false },
-        { name: '📚 Stack', value: `\`\`\`${error.stack?.slice(0, 800) || 'N/A'}\`\`\``, inline: false },
-        { name: '📅 Időpont', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
-    ]);
-});
-
-// Discord error
 client.on('error', (err) => {
     console.error('❌ DISCORD ERROR:', err);
     sendLog('error', '❌ **Discord hiba**', [
         { name: '⚠️ Hiba', value: `\`\`\`${err.message}\`\`\``, inline: false },
-        { name: '📅 Időpont', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+        { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
     ]);
 });
 
@@ -548,118 +445,46 @@ client.on('shardError', (err) => {
     console.error('❌ SHARD ERROR:', err);
     sendLog('error', '❌ **Shard hiba**', [
         { name: '⚠️ Hiba', value: `\`\`\`${err.message}\`\`\``, inline: false },
-        { name: '📅 Időpont', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+        { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
     ]);
 });
 
-// =========================================================================
-// RENDSZERES KARBANTARTÁS LOGOK
-// =========================================================================
-
-// Keep alive log
+// Keep alive
 setInterval(() => {
-    const now = new Date();
-    console.log(`🟢 BOT ONLINE | ${now.toLocaleString()}`);
+    console.log(`🟢 BOT ONLINE | ${new Date().toLocaleString()}`);
     
     sendLog('system', '💚 **Bot heartbeat - Online**', [
         { name: '🤖 Bot', value: `**${client.user?.tag || 'Ismeretlen'}**`, inline: true },
-        { name: '🆔 Bot ID', value: `\`${client.user?.id || '?'}\``, inline: true },
-        { name: '🏠 Szerver', value: `\`${GUILD_ID}\``, inline: true },
-        { name: '📊 Szerverek', value: `\`${client.guilds?.cache?.size || 0}\``, inline: true },
-        { name: '👥 Felhasználók', value: `\`${client.users?.cache?.size || 0}\``, inline: true },
+        { name: '🆔 ID', value: `\`${client.user?.id || '?'}\``, inline: true },
         { name: '🔄 Uptime', value: `${Math.floor(process.uptime() / 60)} perc`, inline: true },
-        { name: '📅 Időpont', value: `<t:${Math.floor(now.getTime()/1000)}:F>`, inline: false }
+        { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
     ]);
 }, 60000);
 
-// RAM monitor log
+// RAM monitor
 setInterval(() => {
     const used = process.memoryUsage();
-    
+    const rssMB = (used.rss / 1024 / 1024).toFixed(2);
+    const heapMB = (used.heapUsed / 1024 / 1024).toFixed(2);
+
     console.log(`
 ========================
 RAM USAGE
-rss: ${(used.rss / 1024 / 1024).toFixed(2)} MB
-heapUsed: ${(used.heapUsed / 1024 / 1024).toFixed(2)} MB
+rss: ${rssMB} MB
+heapUsed: ${heapMB} MB
 ========================
 `);
 
-    const rssMB = (used.rss / 1024 / 1024).toFixed(2);
-    const heapMB = (used.heapUsed / 1024 / 1024).toFixed(2);
-    
-    let status = '🟢';
     let color = 'success';
-    if (rssMB > 200) { status = '🟡'; color = 'warning'; }
-    if (rssMB > 400) { status = '🔴'; color = 'danger'; }
-    
+    let status = '🟢';
+    if (rssMB > 200) { color = 'warning'; status = '🟡'; }
+    if (rssMB > 400) { color = 'danger'; status = '🔴'; }
+
     sendLog(color, `${status} **RAM használat**`, [
-        { name: '💾 RSS memória', value: `\`${rssMB} MB\``, inline: true },
+        { name: '💾 RSS', value: `\`${rssMB} MB\``, inline: true },
         { name: '🧠 Heap used', value: `\`${heapMB} MB\``, inline: true },
         { name: '📊 Heap total', value: `\`${(used.heapTotal / 1024 / 1024).toFixed(2)} MB\``, inline: true },
-        { name: '📁 External', value: `\`${(used.external / 1024 / 1024).toFixed(2)} MB\``, inline: true },
         { name: '🔄 Uptime', value: `${Math.floor(process.uptime() / 60)} perc`, inline: true },
-        { name: '📅 Időpont', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
+        { name: '📅 Idő', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
     ]);
 }, 300000);
-
-// =========================================================================
-// WEBSERVER VÉGPONTOK LOGOK
-// =========================================================================
-
-// Ezt tedd be a GET /verify/:token végpontba
-    { name: '👤 User ID', value: `\`${data?.userId || 'Ismeretlen'}\``, inline: true },
-    { name: '🔑 Token', value: `\`${req?.params?.token?.slice(0, 12) || '?'}...\``, inline: true },
-    { name: '🌍 IP cím', value: `\`${req?.ip || 'Ismeretlen'}\``, inline: true },
-    { name: '📱 Böngésző', value: `\`\`\`${req?.headers?.['user-agent']?.slice(0, 150) || 'Ismeretlen'}\`\`\``, inline: false },
-    { name: '🌐 Referer', value: `${req?.headers?.referer || 'Nincs'}`, inline: false },
-    { name: '🌍 Nyelv', value: `${req?.headers?.['accept-language'] || 'Ismeretlen'}`, inline: false },
-    { name: '📅 Időpont', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
-]);
-
-// Ezt tedd be a POST /accept/:token végpontba
-    { name: '👤 Felhasználó', value: `**${member?.user?.tag || 'Ismeretlen'}**`, inline: true },
-    { name: '🆔 User ID', value: `\`${member?.user?.id || '?'}\``, inline: true },
-    { name: '🎭 Rang 1', value: `<@&${ROLE_ID}>`, inline: true },
-    { name: '🎭 Rang 2', value: `<@&${SECOND_ROLE_ID}>`, inline: true },
-    { name: '🔑 Token', value: `\`${req?.params?.token?.slice(0, 12) || '?'}...\``, inline: true },
-    { name: '🌍 IP cím', value: `\`${req?.ip || 'Ismeretlen'}\``, inline: true },
-    { name: '📱 Böngésző', value: `\`\`\`${req?.headers?.['user-agent']?.slice(0, 100) || 'Ismeretlen'}\`\`\``, inline: false },
-    { name: '📅 Elfogadva', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
-]);
-
-// Ezt tedd be a POST /decline/:token végpontba
-    { name: '👤 User ID', value: `\`${data?.userId || 'Ismeretlen'}\``, inline: true },
-    { name: '🔑 Token', value: `\`${req?.params?.token?.slice(0, 12) || '?'}...\``, inline: true },
-    { name: '🌍 IP cím', value: `\`${req?.ip || 'Ismeretlen'}\``, inline: true },
-    { name: '📱 Böngésző', value: `\`\`\`${req?.headers?.['user-agent']?.slice(0, 100) || 'Ismeretlen'}\`\`\``, inline: false },
-    { name: '📅 Elutasítva', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
-]);
-
-// =========================================================================
-// TOVÁBBI LOGOK
-// =========================================================================
-
-// Webserver indulás
-sendLog('success', '🌍 **Webserver elindult**', [
-    { name: '🔌 Port', value: `\`${PORT}\``, inline: true },
-    { name: '🔗 URL', value: `${BASE_URL}`, inline: true },
-    { name: '📅 Időpont', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
-]);
-
-// Bot leállás (SIGTERM, SIGINT)
-process.on('SIGTERM', () => {
-    sendLog('shutdown', '🛑 **Bot leállítva (SIGTERM)**', [
-        { name: '🤖 Bot', value: `**${client.user?.tag || 'Ismeretlen'}**`, inline: true },
-        { name: '🔄 Uptime', value: `${Math.floor(process.uptime() / 60)} perc`, inline: true },
-        { name: '📅 Leállás', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
-    ]);
-});
-
-process.on('SIGINT', () => {
-    sendLog('shutdown', '🛑 **Bot leállítva (SIGINT)**', [
-        { name: '🤖 Bot', value: `**${client.user?.tag || 'Ismeretlen'}**`, inline: true },
-        { name: '🔄 Uptime', value: `${Math.floor(process.uptime() / 60)} perc`, inline: true },
-        { name: '📅 Leállás', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
-    ]);
-});
-
