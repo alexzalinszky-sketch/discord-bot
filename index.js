@@ -485,7 +485,6 @@ sendLog('request', '🌐 **Link megnyitva böngészőben**', [
 // =========================================================================
 
 // Elfogadás siker
-sendLog('success', '✅ **Szabályzat elfogadva - rangok kiosztva**', [
     { name: '👤 Felhasználó', value: `**${member?.user?.tag || 'Ismeretlen'}**`, inline: true },
     { name: '🆔 User ID', value: `\`${member?.user?.id || '?'}\``, inline: true },
     { name: '🎭 Rang 1', value: `<@&${ROLE_ID}>`, inline: true },
@@ -496,7 +495,6 @@ sendLog('success', '✅ **Szabályzat elfogadva - rangok kiosztva**', [
 ]);
 
 // Elfogadás hiba
-sendLog('error', '❌ **Szabályzat elfogadás HIBA**', [
     { name: '👤 Felhasználó', value: `${member?.user?.tag || 'Ismeretlen'}`, inline: true },
     { name: '🆔 User ID', value: `\`${member?.user?.id || '?'}\``, inline: true },
     { name: '⚠️ Hiba', value: `\`\`\`${e?.message || 'Ismeretlen hiba'}\`\`\``, inline: false },
@@ -504,7 +502,6 @@ sendLog('error', '❌ **Szabályzat elfogadás HIBA**', [
 ]);
 
 // Elutasítás
-sendLog('warning', '❌ **Szabályzat elutasítva**', [
     { name: '👤 Felhasználó ID', value: `\`${data?.userId || 'Ismeretlen'}\``, inline: true },
     { name: '🌍 IP cím', value: `\`${req?.ip || 'Ismeretlen'}\``, inline: true },
     { name: '🔑 Token', value: `\`${req?.params?.token?.slice(0, 12) || '?'}...\``, inline: true },
@@ -512,14 +509,12 @@ sendLog('warning', '❌ **Szabályzat elutasítva**', [
 ]);
 
 // Már hitelesített próbálkozás
-sendLog('warning', '⚠️ **Már hitelesített user próbálkozott**', [
     { name: '👤 Felhasználó', value: `${interaction?.user?.tag || 'Ismeretlen'}`, inline: true },
     { name: '🆔 User ID', value: `\`${interaction?.user?.id || '?'}\``, inline: true },
     { name: '📅 Időpont', value: `<t:${Math.floor(Date.now()/1000)}:F>`, inline: false }
 ]);
 
 // Lejárt token megnyitása
-sendLog('warning', '⏰ **Lejárt/érvénytelen link**', [
     { name: '🔑 Token', value: `\`${req?.params?.token?.slice(0, 12) || '?'}...\``, inline: true },
     { name: '🌍 IP cím', value: `\`${req?.ip || 'Ismeretlen'}\``, inline: true },
     { name: '📱 User-Agent', value: `\`\`\`${req?.headers?.['user-agent']?.slice(0, 100) || 'Ismeretlen'}\`\`\``, inline: false },
@@ -612,7 +607,6 @@ heapUsed: ${(used.heapUsed / 1024 / 1024).toFixed(2)} MB
 // =========================================================================
 
 // Ezt tedd be a GET /verify/:token végpontba
-sendLog('request', '🌐 **Szabályzat oldal betöltve**', [
     { name: '👤 User ID', value: `\`${data?.userId || 'Ismeretlen'}\``, inline: true },
     { name: '🔑 Token', value: `\`${req?.params?.token?.slice(0, 12) || '?'}...\``, inline: true },
     { name: '🌍 IP cím', value: `\`${req?.ip || 'Ismeretlen'}\``, inline: true },
@@ -623,7 +617,6 @@ sendLog('request', '🌐 **Szabályzat oldal betöltve**', [
 ]);
 
 // Ezt tedd be a POST /accept/:token végpontba
-sendLog('success', '✅ **Szabályzat ELFOGADVA**', [
     { name: '👤 Felhasználó', value: `**${member?.user?.tag || 'Ismeretlen'}**`, inline: true },
     { name: '🆔 User ID', value: `\`${member?.user?.id || '?'}\``, inline: true },
     { name: '🎭 Rang 1', value: `<@&${ROLE_ID}>`, inline: true },
@@ -635,7 +628,6 @@ sendLog('success', '✅ **Szabályzat ELFOGADVA**', [
 ]);
 
 // Ezt tedd be a POST /decline/:token végpontba
-sendLog('warning', '❌ **Szabályzat ELUTASÍTVA**', [
     { name: '👤 User ID', value: `\`${data?.userId || 'Ismeretlen'}\``, inline: true },
     { name: '🔑 Token', value: `\`${req?.params?.token?.slice(0, 12) || '?'}...\``, inline: true },
     { name: '🌍 IP cím', value: `\`${req?.ip || 'Ismeretlen'}\``, inline: true },
