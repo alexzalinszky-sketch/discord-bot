@@ -6,9 +6,9 @@ const cors = require('cors');
 // ==========================================
 // --- BEÁLLÍTÁSOK (IDE ÍRD BE AZ ADATOKAT) ---
 // ==========================================
-const GUILD_ID = '1456263565278187653';
-const VERIFY_ROLE_ID = '0';
-const LOG_CHANNEL_ID = '1512779415619371119';
+const GUILD_ID = '1512474765120634950';
+const VERIFY_ROLE_ID = '1514714725487870063';
+const LOG_CHANNEL_ID = '1514714585901563944';
 const BASE_URL = 'https://discord-bot-p8oi.onrender.com'; // Cseréld le a saját Render linkedre!
 const PORT = process.env.PORT || 3000;
 // A bot tokenjét a Render.com-on az "Environment Variables" fülön add meg BOT_TOKEN néven!
