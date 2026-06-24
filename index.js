@@ -9,7 +9,7 @@ const cors = require('cors');
 const GUILD_ID = '1456263565278187653';
 const VERIFY_ROLE_ID = '1519379044662120458';
 const LOG_CHANNEL_ID = '1519379962149339287';
-const BASE_URL = 'https://discord-bot-xd16.onrender.com'; // Cseréld le a saját Render linkedre!
+const BASE_URL = 'https://discord-bot-cfwi.onrender.com'; // Cseréld le a saját Render linkedre!
 const PORT = process.env.PORT || 3000;
 // A bot tokenjét a Render.com-on az "Environment Variables" fülön add meg BOT_TOKEN néven!
 // ==========================================
